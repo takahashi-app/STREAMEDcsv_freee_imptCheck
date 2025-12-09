@@ -430,8 +430,8 @@ def output_stage2_section(processed_df, original_df):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     csv_filename = f"freee_import_{timestamp}.csv"
 
-    # CSVをメモリ上で生成
-    csv_data = processed_df.to_csv(index=False, encoding='cp932')
+    # CSVをメモリ上で生成（UTF-8 with BOMでExcelでも正しく開ける）
+    csv_data = processed_df.to_csv(index=False, encoding='utf-8-sig')
 
     st.download_button(
         label="📥 CSVファイルをダウンロード",
