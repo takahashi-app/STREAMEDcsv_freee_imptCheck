@@ -8,6 +8,7 @@ import pandas as pd
 import os
 import sys
 import subprocess
+import io
 from pathlib import Path
 from datetime import datetime
 from utils.csv_processor import CSVProcessor
@@ -246,49 +247,35 @@ def output_section(df):
 
     st.subheader("💾 Excel出力")
 
-    col1, col2 = st.columns(2)
+    # Excelファイルをメモリ上で生成
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"freee_import_check_{timestamp}.xlsx"
 
-    with col1:
-        if st.button("🖥️ デスクトップへ出力", type="primary", key="excel_desktop_btn"):
-            desktop_path = Path.home() / "Desktop"
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"freee_import_check_{timestamp}.xlsx"
-            output_path = desktop_path / filename
+    # ExcelWriterを使ってメモリ上でファイルを生成
+    buffer = io.BytesIO()
+    writer_obj = ExcelWriter()
 
-            with st.spinner("Excelファイルを出力しています..."):
-                try:
-                    writer = ExcelWriter()
-                    writer.write_to_excel(df, str(output_path))
-                    st.success(f"✅ デスクトップに保存しました: {filename}")
-                    # ファイルを自動で開く
-                    open_file(str(output_path))
-                except Exception as e:
-                    st.error(f"❌ 保存に失敗しました: {str(e)}")
+    # 一時ファイルとして保存してからメモリに読み込む
+    import tempfile
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+        writer_obj.write_to_excel(df, tmp.name)
+        tmp.seek(0)
+        with open(tmp.name, 'rb') as f:
+            buffer.write(f.read())
+        os.unlink(tmp.name)
 
-    with col2:
-        # カスタムパス出力
-        custom_dir = st.text_input("出力先フォルダパス", placeholder="例: C:\\Users\\YourName\\Documents", key="excel_custom_dir")
-        if st.button("📁 指定フォルダへ出力", key="excel_custom_btn"):
-            if custom_dir:
-                try:
-                    custom_path = Path(custom_dir)
-                    if not custom_path.exists():
-                        st.error("❌ 指定されたフォルダが存在しません")
-                    else:
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        filename = f"freee_import_check_{timestamp}.xlsx"
-                        output_path = custom_path / filename
+    buffer.seek(0)
 
-                        with st.spinner("Excelファイルを出力しています..."):
-                            writer = ExcelWriter()
-                            writer.write_to_excel(df, str(output_path))
-                            st.success(f"✅ 保存しました: {output_path}")
-                            # ファイルを自動で開く
-                            open_file(str(output_path))
-                except Exception as e:
-                    st.error(f"❌ 保存に失敗しました: {str(e)}")
-            else:
-                st.warning("⚠️ 出力先フォルダパスを入力してください")
+    # ダウンロードボタン
+    st.download_button(
+        label="📥 Excelファイルをダウンロード",
+        data=buffer,
+        file_name=filename,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        type="primary"
+    )
+
+    st.info("💡 ボタンをクリックすると、ブラウザのダウンロードフォルダに保存されます")
 
 
 def stage2_process():
@@ -440,104 +427,48 @@ def output_stage2_section(processed_df, original_df):
     # CSV出力
     st.subheader("💾 CSV出力（freeeインポート用）")
 
-    col1, col2 = st.columns(2)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    csv_filename = f"freee_import_{timestamp}.csv"
 
-    with col1:
-        if st.button("🖥️ デスクトップへCSV出力", type="primary", key='csv_desktop'):
-            desktop_path = Path.home() / "Desktop"
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"freee_import_{timestamp}.csv"
-            output_path = desktop_path / filename
+    # CSVをメモリ上で生成
+    csv_data = processed_df.to_csv(index=False, encoding='cp932')
 
-            with st.spinner("CSVファイルを出力しています..."):
-                try:
-                    processed_df.to_csv(output_path, index=False, encoding='cp932')
-                    st.success(f"✅ デスクトップに保存しました: {filename}")
-                    open_file(str(output_path))
-                except Exception as e:
-                    st.error(f"❌ 保存に失敗しました: {str(e)}")
-
-    with col2:
-        custom_dir = st.text_input("出力先フォルダパス", placeholder="例: C:\\Users\\YourName\\Documents", key='csv_custom_dir')
-        if st.button("📁 指定フォルダへCSV出力", key='csv_custom'):
-            if custom_dir:
-                try:
-                    custom_path = Path(custom_dir)
-                    if not custom_path.exists():
-                        st.error("❌ 指定されたフォルダが存在しません")
-                    else:
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        filename = f"freee_import_{timestamp}.csv"
-                        output_path = custom_path / filename
-
-                        with st.spinner("CSVファイルを出力しています..."):
-                            processed_df.to_csv(output_path, index=False, encoding='cp932')
-                            st.success(f"✅ 保存しました: {output_path}")
-                            open_file(str(output_path))
-                except Exception as e:
-                    st.error(f"❌ 保存に失敗しました: {str(e)}")
-            else:
-                st.warning("⚠️ 出力先フォルダパスを入力してください")
+    st.download_button(
+        label="📥 CSVファイルをダウンロード",
+        data=csv_data,
+        file_name=csv_filename,
+        mime="text/csv",
+        type="primary"
+    )
 
     # Excel出力（2シート構成）
     st.markdown("---")
     st.subheader("📊 Excel出力（編集前・編集後の2シート）")
 
-    col3, col4 = st.columns(2)
+    excel_filename = f"freee_import_{timestamp}.xlsx"
 
-    with col3:
-        if st.button("🖥️ デスクトップへExcel出力", type="secondary", key='excel2_desktop'):
-            desktop_path = Path.home() / "Desktop"
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"freee_import_{timestamp}.xlsx"
-            output_path = desktop_path / filename
-
-            with st.spinner("Excelファイルを出力しています..."):
-                try:
-                    write_stage2_excel(original_df, processed_df, str(output_path))
-                    st.success(f"✅ デスクトップに保存しました: {filename}")
-                    open_file(str(output_path))
-                except Exception as e:
-                    st.error(f"❌ 保存に失敗しました: {str(e)}")
-
-    with col4:
-        custom_dir2 = st.text_input("出力先フォルダパス", placeholder="例: C:\\Users\\YourName\\Documents", key='excel2_custom_dir')
-        if st.button("📁 指定フォルダへExcel出力", key='excel2_custom'):
-            if custom_dir2:
-                try:
-                    custom_path = Path(custom_dir2)
-                    if not custom_path.exists():
-                        st.error("❌ 指定されたフォルダが存在しません")
-                    else:
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        filename = f"freee_import_{timestamp}.xlsx"
-                        output_path = custom_path / filename
-
-                        with st.spinner("Excelファイルを出力しています..."):
-                            write_stage2_excel(original_df, processed_df, str(output_path))
-                            st.success(f"✅ 保存しました: {output_path}")
-                            open_file(str(output_path))
-                except Exception as e:
-                    st.error(f"❌ 保存に失敗しました: {str(e)}")
-            else:
-                st.warning("⚠️ 出力先フォルダパスを入力してください")
-
-
-def write_stage2_excel(original_df, processed_df, output_path):
-    """
-    ステージ2用のExcelを出力（2シート構成）
-
-    Args:
-        original_df: 元のExcelデータ（編集前）
-        processed_df: 処理後のデータ（編集後）
-        output_path: 出力先パス
-    """
-    with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+    # Excelファイルをメモリ上で生成
+    excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
         # シート1: 編集前のデータ
-        original_df.to_excel(writer, sheet_name='編集前', index=False)
-
+        if original_df is not None:
+            original_df.to_excel(writer, sheet_name='編集前', index=False)
         # シート2: 編集後のデータ
         processed_df.to_excel(writer, sheet_name='編集後（freeeインポート用）', index=False)
+
+    excel_buffer.seek(0)
+
+    st.download_button(
+        label="📥 Excelファイルをダウンロード（2シート）",
+        data=excel_buffer,
+        file_name=excel_filename,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        type="secondary"
+    )
+
+    st.info("💡 ボタンをクリックすると、ブラウザのダウンロードフォルダに保存されます")
+
+
 
 
 if __name__ == "__main__":
