@@ -430,10 +430,10 @@ def output_stage2_section(processed_df, original_df):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     csv_filename = f"freee_import_{timestamp}.csv"
 
-    # CSVをメモリ上で生成（Shift-JISでExcelとfreeeで正しく開ける）
-    csv_string = processed_df.to_csv(index=False)
-    # Shift-JISで表現できない文字は '?' に置換
-    csv_data = csv_string.encode('shift_jis', errors='replace')
+    # CSVをメモリ上で生成（CP932でExcelとfreeeで正しく開ける）
+    buffer = io.BytesIO()
+    processed_df.to_csv(buffer, index=False, encoding='cp932')
+    csv_data = buffer.getvalue()
 
     st.download_button(
         label="📥 CSVファイルをダウンロード",
@@ -444,7 +444,6 @@ def output_stage2_section(processed_df, original_df):
     )
 
     st.info("💡 ボタンをクリックすると、ブラウザのダウンロードフォルダに保存されます")
-    st.caption("⚠️ 特殊な記号や文字は '?' に置換される場合があります")
 
     # Excel出力（2シート構成）
     st.markdown("---")
