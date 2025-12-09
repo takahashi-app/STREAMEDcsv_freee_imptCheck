@@ -432,7 +432,8 @@ def output_stage2_section(processed_df, original_df):
 
     # CSVをメモリ上で生成（CP932でExcelとfreeeで正しく開ける）
     buffer = io.BytesIO()
-    processed_df.to_csv(buffer, index=False, encoding='cp932')
+    # float_format='%.0f'で小数点以下を出力しない（freeeインポート用）
+    processed_df.to_csv(buffer, index=False, encoding='cp932', float_format='%.0f')
     csv_data = buffer.getvalue()
 
     st.download_button(
